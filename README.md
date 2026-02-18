@@ -1,3 +1,3 @@
 # TubeSorter
 
-Organize your YouTube subscriptions by topic. Automatically groups new videos from specific channels into themed playlists
+Because YouTube subscriptions deserve folders. Automatically keep your themed playlists up to date.
