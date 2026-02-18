@@ -1,0 +1,11 @@
+services:
+  tube-sorter:
+    build: .
+    container_name: tube-sorter
+    restart: unless-stopped
+    environment:
+      - INTERVAL=0.01  
+      - TZ=Europe/Madrid
+    volumes:
+      - ./secrets:/app/secrets
+      - ./config:/app/config

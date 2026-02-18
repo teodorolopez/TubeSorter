@@ -1,0 +1,22 @@
+FROM python:3.14-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+ENV INTERVAL=24
+ENV SECRETS_DIR=/app/secrets
+ENV CONFIG_DIR=/app/config
+
+RUN mkdir -p ${SECRETS_DIR} ${CONFIG_DIR}
+
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+  CMD pgrep -f "tube-sorter.py" || exit 1
+
+CMD ["python", "tube-sorter.py"]
