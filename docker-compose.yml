@@ -4,7 +4,8 @@ services:
     container_name: tube-sorter
     restart: unless-stopped
     environment:
-      - CHECK_CHANNELS_EVERY_HOURS=0.01
+      - CHECK_CHANNELS_EVERY_HOURS=24
+      - NUMBER_OF_VIDEOS_TO_PROCESS=5
       - TZ=Europe/Madrid
     volumes:
       - ./secrets:/app/secrets
