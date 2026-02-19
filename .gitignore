@@ -209,3 +209,6 @@ __marimo__/
 # Private configuration and secrets
 config/
 secrets/
+
+.DS_Store
+.vscode/
