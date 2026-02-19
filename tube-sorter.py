@@ -1,22 +1,41 @@
 import os
 import time
 import sys
+from config import *
 
-try:
-    INTERVAL = float(os.getenv('INTERVAL', '24'))
-except ValueError:
-    print("Error: INTERVAL debe ser un número válido. Usando valor predeterminado de 24 horas.")
-    INTERVAL = 24.0
+def initial_config_check():
+    print("Intial configuration check:")
+    print(f" -> CHECK_CHANNELS_EVERY_HOURS: {CHECK_CHANNELS_EVERY_HOURS}")
+    print(f" -> SECRETS_DIR: {SECRETS_DIR}")
+    print(f" -> CONFIG_DIR: {CONFIG_DIR}")
+    
+    # Verificar que las carpetas existen
+    if not SECRETS_DIR.exists():
+        print(f"Error: SECRETS_DIR '{SECRETS_DIR}' not found.")
+        sys.exit(1)
+    if not CONFIG_DIR.exists():
+        print(f"Error: CONFIG_DIR '{CONFIG_DIR}' not found.")
+        sys.exit(1)
 
-INTERVAL_SECONDS = INTERVAL * 3600
+    if not GOOGLE_API_KEY_FILE.exists():
+        print(f"ERROR CRÍTICO: No se encontró el archivo {GOOGLE_API_KEY_FILE}")
+        youtube_oauth()
 
-SECRETS_DIR = os.getenv('SECRETS_DIR', '/app/secrets')
-CONFIG_DIR = os.getenv('CONFIG_DIR', '/app/config')
+    if not TOKEN_FILE.exists():
+        print(f"ERROR CRÍTICO: No se encontró el archivo {TOKEN_FILE}")
+        youtube_oauth()  # Simular autenticación para crear el token
 
-print(f"--- Iniciando Script ---")
-print(f"Modo: Ciclo infinito cada {INTERVAL} horas")
-print(f"Leyendo archivos de: {SECRETS_DIR}")
-print(f"Guardando resultados en: {CONFIG_DIR}")
+    if not CONFIG_FILE.exists():
+        print(f"ERROR CRÍTICO: No se encontró el archivo {CONFIG_FILE}")
+        sys.exit(1)
+
+    print("Chequeo inicial completado.")
+
+def youtube_oauth():
+    print("Simulando autenticación OAuth con YouTube...")
+    # Aquí iría tu lógica de autenticación
+    time.sleep(1)  # Simular tiempo de autenticación
+    print("Autenticación simulada completada.")
 
 def tarea_youtube():
     print(f"[{time.strftime('%H:%M:%S')}] Conectando con YouTube API... (Simulado)")
@@ -34,16 +53,15 @@ def tarea_youtube():
         print(f"Error accediendo a carpetas: {e}")
 
 if __name__ == "__main__":
-    print("Iniciando bot...")
+    print("Iniciando...")
+    initial_config_check()
     
-    # Ejecutamos la primera vez nada más arrancar (opcional, pero recomendado)
     try:
         while True:
             tarea_youtube()
-            print(f"Durmiendo durante {INTERVAL} horas...")
-            time.sleep(INTERVAL_SECONDS)
+            print(f"Waiting {CHECK_CHANNELS_EVERY_HOURS} hours for the next update check...")
+            time.sleep(CHECK_CHANNELS_EVERY_HOURS * 3600)
         
     except KeyboardInterrupt:
         print("Bot detenido por el usuario.")
         sys.exit(0)
-    
