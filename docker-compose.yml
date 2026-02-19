@@ -4,7 +4,7 @@ services:
     container_name: tube-sorter
     restart: unless-stopped
     environment:
-      - INTERVAL=0.01  
+      - CHECK_CHANNELS_EVERY_HOURS=0.01
       - TZ=Europe/Madrid
     volumes:
       - ./secrets:/app/secrets
