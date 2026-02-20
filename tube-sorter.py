@@ -8,6 +8,7 @@ from pathlib import Path
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
+from googleapiclient.errors import HttpError
 
 CHECK_CHANNELS_EVERY_HOURS = float(os.getenv('CHECK_CHANNELS_EVERY_HOURS', '24'))
 SECRETS_DIR = Path(os.getenv('SECRETS_DIR', '/app/secrets'))
@@ -24,6 +25,9 @@ API_VERSION = 'v3'
 
 NUMBER_OF_VIDEOS_TO_PROCESS = int(os.getenv('NUMBER_OF_VIDEOS_TO_PROCESS', '5'))
 
+class QuotaExceededError(Exception):
+    """Excepción personalizada para indicar que se ha excedido la cuota de la API de YouTube."""
+    pass
 
 def authenticate_youtube():
     creds = None
@@ -166,49 +170,62 @@ def add_video_to_playlist(youtube, video_id, target_playlist_id):
 def sync_playlists(youtube, config_data):
     print(f"\n[{time.strftime('%H:%M:%S')}] Iniciando ciclo de revisión de canales...")
 
-    for playlist_info in config_data.get('playlists', []):
+    try:
+        for playlist_info in config_data.get('playlists', []):
 
-        # Comprobar si la playlist está activa
-        if not playlist_info.get('active', True):
-            print(f" Saltando playlist inactiva: {playlist_info.get('name', 'Desconocida')}")
-            continue
-
-        target_playlist_id = playlist_info['playlist_id']
-        print(f"\n Procesando Playlist Objetivo: {playlist_info['name']}")
-
-        for channel in playlist_info.get('channels', []):
-            
-            if not channel.get('active', True):
-                print(f"  ⏭️ Saltando canal inactivo: {channel.get('name', 'Desconocido')}")
+            # Comprobar si la playlist está activa
+            if not playlist_info.get('active', True):
+                print(f" Saltando playlist inactiva: {playlist_info.get('name', 'Desconocida')}")
                 continue
-                
-            print(f"  📺 Revisando canal: {channel['name']}")
 
-            try:
-                # Paso A: Obtener el ID de la lista "Uploads" del canal
-                uploads_playlist_id = get_channel_upload_playlist(youtube, channel['id'])
-                if not uploads_playlist_id:
-                    print(f"    ⚠️ No se encontró la lista de subidas para {channel['name']}")
+            target_playlist_id = playlist_info['playlist_id']
+            print(f"\n Procesando Playlist Objetivo: {playlist_info['name']}")
+
+            for channel in playlist_info.get('channels', []):
+                
+                if not channel.get('active', True):
+                    print(f"  ⏭️ Saltando canal inactivo: {channel.get('name', 'Desconocido')}")
                     continue
                     
-                # Paso B: Obtener los últimos N videos (determinado por NUMBER_OF_VIDEOS_TO_PROCESS)
-                videos = get_videos_from_playlist(youtube, uploads_playlist_id)
-                
-                # Paso C: Comprobar la BD y añadir si es nuevo
-                nuevos_añadidos = 0
-                for video_id, channel_id in videos:
-                    # Usamos tu base de datos SQLite para validar
-                    if not has_been_processed(video_id, target_playlist_id):
-                        print(f"    ➕ Añadiendo nuevo video ({video_id}) a la playlist...")
-                        add_video_to_playlist(youtube, video_id, target_playlist_id)
-                        save_to_history(video_id, channel_id, target_playlist_id)
-                        nuevos_añadidos += 1
-                        
-                if nuevos_añadidos == 0:
-                    print("    ✔️ Sin videos nuevos.")
+                print(f"  📺 Revisando canal: {channel['name']}")
 
-            except Exception as e:
-                print(f"    ❌ Error procesando el canal {channel['name']}: {e}")
+                try:
+                    # Paso A: Obtener el ID de la lista "Uploads" del canal
+                    uploads_playlist_id = get_channel_upload_playlist(youtube, channel['id'])
+                    if not uploads_playlist_id:
+                        print(f"    ⚠️ No se encontró la lista de subidas para {channel['name']}")
+                        continue
+                        
+                    # Paso B: Obtener los últimos N videos (determinado por NUMBER_OF_VIDEOS_TO_PROCESS)
+                    videos = get_videos_from_playlist(youtube, uploads_playlist_id)
+                    
+                    # Paso C: Comprobar la BD y añadir si es nuevo
+                    nuevos_añadidos = 0
+                    for video_id, channel_id in videos:
+                        # Usamos tu base de datos SQLite para validar
+                        if not has_been_processed(video_id, target_playlist_id):
+                            print(f"    ➕ Añadiendo nuevo video ({video_id}) a la playlist...")
+                            add_video_to_playlist(youtube, video_id, target_playlist_id)
+                            save_to_history(video_id, channel_id, target_playlist_id)
+                            nuevos_añadidos += 1
+                            
+                    if nuevos_añadidos == 0:
+                        print("    ✔️ Sin videos nuevos.")
+                        
+                except HttpError as e:
+                    # Verificar si es error de cuota
+                    if e.resp.status in [403, 429] and 'quotaExceeded' in str(e):
+                        print(f"\n[🛑 CRÍTICO] Cuota de API agotada. Abortando ciclo actual.")
+                        raise QuotaExceededError("Cuota agotada")
+                    else:
+                        print(f"    ❌ Error de API en canal {channel['name']}: {e}")
+
+                except Exception as e:
+                    print(f"    ❌ Error procesando el canal {channel['name']}: {e}")
+
+    except QuotaExceededError:
+        # Aquí capturamos el error que lanzamos arriba para salir de los bucles anidados
+        print("Reintentando en el próximo ciclo programado...")
 
     print(f"\n[{time.strftime('%H:%M:%S')}] Ciclo completado.")
 
