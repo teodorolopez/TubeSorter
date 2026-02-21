@@ -1,6 +1,7 @@
 services:
   tube-sorter:
     build: .
+    image: tube-sorter:latest
     container_name: tube-sorter
     restart: unless-stopped
     environment:
